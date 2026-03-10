@@ -4,21 +4,50 @@ A deep embedding of the ALC description logic in [Lean 4](https://lean-lang.org)
 
 The point: Lean is both a theorem prover and a programming language. This project uses both sides — you can **prove** metatheorems about ALC and **execute** knowledge base queries in the same language, with the same definitions.
 
-## What's here
+## Custom notation
 
-**Syntax** — ALC concepts as an inductive type with notation:
+None of the DL-specific syntax below is built into Lean. It's all defined in the project using Lean's macro system (about 70 lines in [`Syntax.lean`](DescrLogic/Syntax.lean) and [`Basic.lean`](DescrLogic/Basic.lean)).
+
+**Concept declarations** — the `concept` and `role` commands are custom:
 
 ```lean
-concept Person
+concept Person      -- declares an atomic concept
 concept Female
+role hasChild       -- declares a role name
+```
 
-role hasChild
+**Concept expressions** — standard DL connectives, defined as custom infix/prefix operators:
 
--- Concepts compose with ⊓ (and), ⊔ (or), ~ (not), ∀ᵣ, ∃ᵣ
+| Notation | Meaning | Standard DL |
+|----------|---------|-------------|
+| `C ⊓ D` | conjunction | C ⊓ D |
+| `C ⊔ D` | disjunction | C ⊔ D |
+| `~ C` | negation | ¬C |
+| `∀ᵣ r, C` | universal restriction | ∀r.C |
+| `∃ᵣ r, C` | existential restriction | ∃r.C |
+| `C ⊑ D` | concept inclusion (TBox) | C ⊑ D |
+
+So you can write concept expressions that read like textbook DL:
+
+```lean
 def Mother := Female ⊓ (∃ᵣ hasChild, .top)
 ```
 
-**Semantics** — Standard set-theoretic interpretation (`Concept.eval`):
+**Knowledge base declarations** — the `knowledge` command is a custom macro that parses a block of concept membership and role assertions, collects the individual names automatically, and generates the internal data structure:
+
+```lean
+knowledge family where
+  Alice   : Person, Female, Parent
+  Bob     : Person, Male, Parent
+  Charlie : Person, Male
+  Diana   : Person, Female
+  Alice hasChild Charlie
+  Bob hasChild Diana
+```
+
+## Semantics
+
+Standard set-theoretic interpretation, defined as a recursive function from concepts to predicates over a domain:
 
 ```lean
 def Concept.eval (I : Interp α) : Concept → α → Prop
@@ -32,7 +61,11 @@ def Concept.eval (I : Interp α) : Concept → α → Prop
   | .ex r C, a    => ∃ b, I.role r a b ∧ C.eval I b
 ```
 
-**Metatheory** — Proved against the semantics (no sorry):
+This is both the formal specification (used in proofs) and the basis for the computable evaluator.
+
+## Proofs
+
+Metatheorems proved directly against the semantics (no axioms, no `sorry`):
 
 ```lean
 theorem de_morgan_conj (I : Interp α) (C D : Concept) :
@@ -42,17 +75,11 @@ theorem neg_neg (I : Interp α) (C : Concept) :
     equiv I (~ (~ C)) C := ...
 ```
 
-**Computable finite interpretations** — `FinInterp n` evaluates concepts over `Fin n` using `Bool`, so everything runs:
+## Executable queries
+
+`#eval` runs queries at compile time — Lean computes the answers:
 
 ```lean
-knowledge family where
-  Alice   : Person, Female, Parent
-  Bob     : Person, Male, Parent
-  Charlie : Person, Male
-  Diana   : Person, Female
-  Alice hasChild Charlie
-  Bob hasChild Diana
-
 #eval family.extensionNames (∃ᵣ hasChild, Female)
 -- ["Bob"]
 
@@ -63,7 +90,7 @@ knowledge family where
 -- false
 ```
 
-**TBox reasoning:**
+TBox satisfaction checking:
 
 ```lean
 def familyTBox : TBox := [
@@ -78,11 +105,11 @@ def familyTBox : TBox := [
 
 | File | Contents |
 |------|----------|
-| `Basic.lean` | `Concept` inductive, `Interp`, `Concept.eval`, notation, metatheorems |
-| `Finite.lean` | `FinInterp n` with `Bool`-valued evaluation, extension/subsumption/satisfiability |
-| `KB.lean` | `KB` structure (named individuals + fact lists), compiles to `FinInterp` |
-| `Syntax.lean` | `concept`, `role`, and `knowledge` command macros |
-| `Demo.lean` | Family ontology example with executable queries |
+| [`Basic.lean`](DescrLogic/Basic.lean) | `Concept` inductive type, `Interp`, semantic evaluation, operator notation, metatheorems |
+| [`Finite.lean`](DescrLogic/Finite.lean) | `FinInterp n` — computable `Bool`-valued evaluation over finite domains |
+| [`KB.lean`](DescrLogic/KB.lean) | `KB` — named individuals + fact lists, compiles to `FinInterp` |
+| [`Syntax.lean`](DescrLogic/Syntax.lean) | `concept`, `role`, and `knowledge` command macros |
+| [`Demo.lean`](DescrLogic/Demo.lean) | Family ontology example with executable queries |
 
 ## Building
 
