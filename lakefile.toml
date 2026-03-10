@@ -1,0 +1,10 @@
+name = "DescrLogic"
+version = "0.1.0"
+defaultTargets = ["descrlogic"]
+
+[[lean_lib]]
+name = "DescrLogic"
+
+[[lean_exe]]
+name = "descrlogic"
+root = "Main"
