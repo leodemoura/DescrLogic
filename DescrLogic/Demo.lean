@@ -1,16 +1,10 @@
-import DescrLogic.Finite
+import DescrLogic.KB
 
 namespace DescrLogic
 
 open Concept
 
-/-! ## A simple family ontology
-
-Domain: `Fin 4` representing {Alice=0, Bob=1, Charlie=2, Diana=3}
-
-Concepts: Person, Parent, Female, Male
-Roles: hasChild
--/
+/-! ## A simple family ontology -/
 
 /-- Shorthand for atomic concepts. -/
 def c (name : String) : Concept := .atom name
@@ -22,99 +16,93 @@ def Male   := c "Male"
 
 def hasChild : RName := "hasChild"
 
-/-- Our family interpretation over 4 individuals. -/
-def familyInterp : FinInterp 4 where
-  concept name i := match name, i.val with
-    | "Person", _ => true       -- everyone is a person
-    | "Female", 0 => true       -- Alice is female
-    | "Female", 3 => true       -- Diana is female
-    | "Male",   1 => true       -- Bob is male
-    | "Male",   2 => true       -- Charlie is male
-    | "Parent", 0 => true       -- Alice is a parent
-    | "Parent", 1 => true       -- Bob is a parent
-    | _, _ => false
-  role name i j := match name, i.val, j.val with
-    | "hasChild", 0, 2 => true  -- Alice hasChild Charlie
-    | "hasChild", 1, 3 => true  -- Bob hasChild Diana
-    | _, _, _ => false
+/-- Our family knowledge base. -/
+def family : KB where
+  individuals := #["Alice", "Bob", "Charlie", "Diana"]
+  conceptFacts := [
+    ("Alice",   "Person"), ("Alice",   "Female"), ("Alice",   "Parent"),
+    ("Bob",     "Person"), ("Bob",     "Male"),   ("Bob",     "Parent"),
+    ("Charlie", "Person"), ("Charlie", "Male"),
+    ("Diana",   "Person"), ("Diana",   "Female")
+  ]
+  roleFacts := [
+    ("Alice", "hasChild", "Charlie"),
+    ("Bob",   "hasChild", "Diana")
+  ]
 
 /-! ## Queries that compute -/
 
 -- Who is a Person?
-#eval familyInterp.extension Person
--- expected: [0, 1, 2, 3]
+#eval family.extensionNames Person
+-- expected: ["Alice", "Bob", "Charlie", "Diana"]
 
 -- Who is Female?
-#eval familyInterp.extension Female
--- expected: [0, 3]
+#eval family.extensionNames Female
+-- expected: ["Alice", "Diana"]
 
 -- Who is a Female Parent?
-#eval familyInterp.extension (Female ⊓ Parent)
--- expected: [0]  (Alice)
+#eval family.extensionNames (Female ⊓ Parent)
+-- expected: ["Alice"]
 
 -- Who is Male or Female?
-#eval familyInterp.extension (Male ⊔ Female)
--- expected: [0, 1, 2, 3]
+#eval family.extensionNames (Male ⊔ Female)
+-- expected: ["Alice", "Bob", "Charlie", "Diana"]
 
 -- Who has a female child? (∃ hasChild. Female)
-#eval familyInterp.extension (∃ᵣ hasChild, Female)
--- expected: [1]  (Bob, since Diana is female)
+#eval family.extensionNames (∃ᵣ hasChild, Female)
+-- expected: ["Bob"]
 
 -- Who has only male children? (∀ hasChild. Male)
-#eval familyInterp.extension (∀ᵣ hasChild, Male)
--- expected: [0, 2, 3]  (Alice's child Charlie is male; Charlie and Diana have no children, so vacuously true)
+#eval family.extensionNames (∀ᵣ hasChild, Male)
+-- expected: ["Alice", "Charlie", "Diana"]
 
 -- Who is not a Parent?
-#eval familyInterp.extension (~ Parent)
--- expected: [2, 3]
+#eval family.extensionNames (~ Parent)
+-- expected: ["Charlie", "Diana"]
 
 /-! ## Subsumption checks -/
 
 -- Female ⊓ Parent ⊑ Parent?
-#eval familyInterp.subsumes (Female ⊓ Parent) Parent
+#eval family.subsumes (Female ⊓ Parent) Parent
 -- expected: true
 
 -- Parent ⊑ Female?
-#eval familyInterp.subsumes Parent Female
--- expected: false (Bob is a Parent but not Female)
-
--- Does the concept (Male ⊓ Female) have instances?
-#eval familyInterp.satisfiable (Male ⊓ Female)
+#eval family.subsumes Parent Female
 -- expected: false
 
--- Does (Parent ⊓ ~ Female) have instances?
-#eval familyInterp.satisfiable (Parent ⊓ ~ Female)
+-- Does Male ⊓ Female have instances?
+#eval family.satisfiable (Male ⊓ Female)
+-- expected: false
+
+-- Does Parent ⊓ ~ Female have instances?
+#eval family.satisfiable (Parent ⊓ ~ Female)
 -- expected: true (Bob)
 
 /-! ## TBox reasoning -/
 
 def familyTBox : TBox := [
-  Parent ⊑ Person,                       -- Parents are Persons
-  (∃ᵣ hasChild, .top) ⊑ Parent           -- Having a child makes you a Parent
+  Parent ⊑ Person,
+  (∃ᵣ hasChild, .top) ⊑ Parent
 ]
 
--- Does our interpretation satisfy the TBox?
-#eval familyInterp.satisfiesTBox familyTBox
+#eval family.satisfiesTBox familyTBox
 -- expected: true
 
-/-! ## A richer concept: Mother = Female ⊓ ∃ hasChild. ⊤ -/
+/-! ## Defined concepts -/
 
 def Mother := Female ⊓ (∃ᵣ hasChild, .top)
-
-#eval familyInterp.extension Mother
--- expected: [0]  (Alice)
-
 def Father := Male ⊓ (∃ᵣ hasChild, .top)
 
-#eval familyInterp.extension Father
--- expected: [1]  (Bob)
+#eval family.extensionNames Mother
+-- expected: ["Alice"]
 
--- Mother ⊑ Parent?
-#eval familyInterp.subsumes Mother Parent
+#eval family.extensionNames Father
+-- expected: ["Bob"]
+
+#eval family.subsumes Mother Parent
 -- expected: true
 
--- Mother ≡ Female ⊓ Parent?
-#eval familyInterp.equiv Mother (Female ⊓ Parent)
--- expected: true (in this interpretation)
+#eval family.equiv Mother (Female ⊓ Parent)
+-- expected: true
 
 end DescrLogic
