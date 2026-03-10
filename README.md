@@ -67,12 +67,44 @@ This is both the formal specification (used in proofs) and the basis for the com
 
 Metatheorems proved directly against the semantics (no axioms, no `sorry`):
 
-```lean
-theorem de_morgan_conj (I : Interp α) (C D : Concept) :
-    equiv I (~ (C ⊓ D)) (~ C ⊔ ~ D) := ...
+**Subsumption-unsatisfiability reduction** — the foundational result behind all tableau-based DL reasoners. Checking C ⊑ D reduces to checking that C ⊓ ¬D is unsatisfiable:
 
-theorem neg_neg (I : Interp α) (C : Concept) :
-    equiv I (~ (~ C)) C := ...
+```lean
+theorem valid_subsumes_iff_unsat (C D : Concept) :
+    validSubsumes C D ↔ ¬ satisfiable (C ⊓ ~ D)
+```
+
+**Modal duality** — ALC is multi-modal K. These are the □/◇ duality laws:
+
+```lean
+theorem exist_neg_dual : equiv I (~ (∃ᵣ r, C)) (∀ᵣ r, ~ C)
+theorem all_neg_dual   : equiv I (~ (∀ᵣ r, C)) (∃ᵣ r, ~ C)
+```
+
+**Monotonicity** — restrictions preserve subsumption:
+
+```lean
+theorem exist_mono (h : subsumes I C D) : subsumes I (∃ᵣ r, C) (∃ᵣ r, D)
+theorem all_mono   (h : subsumes I C D) : subsumes I (∀ᵣ r, C) (∀ᵣ r, D)
+```
+
+**Distributivity** — ∀r distributes over ⊓, ∃r distributes over ⊔ (full equivalence), but the other combinations only hold in one direction (subsumption, not equivalence):
+
+```lean
+theorem all_conj_distrib   : equiv I (∀ᵣ r, C ⊓ D) ((∀ᵣ r, C) ⊓ (∀ᵣ r, D))
+theorem exist_disj_distrib : equiv I (∃ᵣ r, C ⊔ D) ((∃ᵣ r, C) ⊔ (∃ᵣ r, D))
+
+-- Only one direction:
+theorem exist_conj_sub  : subsumes I (∃ᵣ r, C ⊓ D) ((∃ᵣ r, C) ⊓ (∃ᵣ r, D))
+theorem all_disj_super  : subsumes I ((∀ᵣ r, C) ⊔ (∀ᵣ r, D)) (∀ᵣ r, C ⊔ D)
+```
+
+**Boolean algebra** — De Morgan, double negation, etc.:
+
+```lean
+theorem de_morgan_conj : equiv I (~ (C ⊓ D)) (~ C ⊔ ~ D)
+theorem de_morgan_disj : equiv I (~ (C ⊔ D)) (~ C ⊓ ~ D)
+theorem neg_neg        : equiv I (~ (~ C)) C
 ```
 
 ## Executable queries

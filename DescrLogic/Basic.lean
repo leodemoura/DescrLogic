@@ -98,4 +98,87 @@ theorem de_morgan_disj (I : Interp α) (C D : Concept) :
     equiv I (~ (C ⊔ D)) (~ C ⊓ ~ D) :=
   fun _ => not_or
 
+/-! ## Subsumption-unsatisfiability reduction
+
+The foundational result in DL reasoning: checking C ⊑ D reduces to
+checking that C ⊓ ¬D is unsatisfiable. All tableau-based DL reasoners
+rely on this. -/
+
+open Concept in
+theorem valid_subsumes_iff_unsat (C D : Concept) :
+    validSubsumes C D ↔ ¬ satisfiable (C ⊓ ~ D) := by
+  constructor
+  · intro h ⟨α, I, a, hC, hD⟩
+    exact hD (h α I a hC)
+  · intro h α I a hC
+    exact Classical.byContradiction fun hD => h ⟨α, I, a, hC, hD⟩
+
+/-! ## Modal duality
+
+ALC is multi-modal K. These are the duality laws between
+universal and existential restrictions — the DL analogues of
+the □/◇ duality in modal logic. -/
+
+open Concept in
+theorem exist_neg_dual (I : Interp α) (r : RName) (C : Concept) :
+    equiv I (~ (∃ᵣ r, C)) (∀ᵣ r, ~ C) :=
+  fun _ =>
+    ⟨fun h b hr hc => h ⟨b, hr, hc⟩,
+     fun h ⟨b, hr, hc⟩ => h b hr hc⟩
+
+open Concept in
+theorem all_neg_dual (I : Interp α) (r : RName) (C : Concept) :
+    equiv I (~ (∀ᵣ r, C)) (∃ᵣ r, ~ C) :=
+  fun _ =>
+    ⟨fun h => Classical.byContradiction fun hne =>
+       h fun b hr => Classical.byContradiction fun hc => hne ⟨b, hr, hc⟩,
+     fun ⟨b, hr, hc⟩ h => hc (h b hr)⟩
+
+/-! ## Monotonicity of restrictions
+
+If C ⊑ D in an interpretation, then ∃r.C ⊑ ∃r.D and ∀r.C ⊑ ∀r.D. -/
+
+open Concept in
+theorem exist_mono (I : Interp α) (r : RName) (C D : Concept)
+    (h : subsumes I C D) : subsumes I (∃ᵣ r, C) (∃ᵣ r, D) :=
+  fun _ ⟨b, hr, hc⟩ => ⟨b, hr, h b hc⟩
+
+open Concept in
+theorem all_mono (I : Interp α) (r : RName) (C D : Concept)
+    (h : subsumes I C D) : subsumes I (∀ᵣ r, C) (∀ᵣ r, D) :=
+  fun _ ha b hr => h b (ha b hr)
+
+/-! ## Distributivity
+
+∀r distributes over ⊓, and ∃r distributes over ⊔.
+The converses (∃r over ⊓, ∀r over ⊔) only hold in one direction. -/
+
+open Concept in
+theorem all_conj_distrib (I : Interp α) (r : RName) (C D : Concept) :
+    equiv I (∀ᵣ r, C ⊓ D) ((∀ᵣ r, C) ⊓ (∀ᵣ r, D)) :=
+  fun _ =>
+    ⟨fun h => ⟨fun b hr => (h b hr).1, fun b hr => (h b hr).2⟩,
+     fun ⟨hc, hd⟩ b hr => ⟨hc b hr, hd b hr⟩⟩
+
+open Concept in
+theorem exist_disj_distrib (I : Interp α) (r : RName) (C D : Concept) :
+    equiv I (∃ᵣ r, C ⊔ D) ((∃ᵣ r, C) ⊔ (∃ᵣ r, D)) :=
+  fun _ =>
+    ⟨fun ⟨b, hr, hcd⟩ => hcd.elim (fun hc => Or.inl ⟨b, hr, hc⟩)
+                                     (fun hd => Or.inr ⟨b, hr, hd⟩),
+     fun h => h.elim (fun ⟨b, hr, hc⟩ => ⟨b, hr, Or.inl hc⟩)
+                     (fun ⟨b, hr, hd⟩ => ⟨b, hr, Or.inr hd⟩)⟩
+
+open Concept in
+/-- ∃r does NOT distribute over ⊓ — only one direction holds. -/
+theorem exist_conj_sub (I : Interp α) (r : RName) (C D : Concept) :
+    subsumes I (∃ᵣ r, C ⊓ D) ((∃ᵣ r, C) ⊓ (∃ᵣ r, D)) :=
+  fun _ ⟨b, hr, hc, hd⟩ => ⟨⟨b, hr, hc⟩, ⟨b, hr, hd⟩⟩
+
+open Concept in
+/-- ∀r does NOT distribute over ⊔ — only one direction holds. -/
+theorem all_disj_super (I : Interp α) (r : RName) (C D : Concept) :
+    subsumes I ((∀ᵣ r, C) ⊔ (∀ᵣ r, D)) (∀ᵣ r, C ⊔ D) :=
+  fun _ h b hr => h.elim (fun hc => Or.inl (hc b hr)) (fun hd => Or.inr (hd b hr))
+
 end DescrLogic
